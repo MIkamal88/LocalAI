@@ -1,0 +1,83 @@
+services:
+  llama-cpp:
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    container_name: llama-cpp
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    env_file: .env
+    volumes:
+      - ./models:/models:ro
+      - ./entrypoint.sh:/entrypoint.sh
+    ports:
+      - "11434:11434"
+    entrypoint: ["/bin/bash", "/entrypoint.sh"]
+    healthcheck:
+      disable: true
+    restart: unless-stopped
+    stop_grace_period: 2s
+    networks: [local_llm]
+
+  open_webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open_webui
+    env_file: .env
+    ports:
+      - "8085:8080"
+    volumes:
+      - ./openwebui-data:/app/backend/data:cached
+    depends_on: [llama-cpp]
+    healthcheck:
+      disable: true
+    restart: unless-stopped
+    stop_grace_period: 2s
+    networks: [local_llm]
+
+  caddy:
+    image: caddy:latest
+    container_name: caddy
+    depends_on: [open_webui]
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy_data:/data:cached
+      - ./caddy_config:/config:cached 
+    tmpfs:
+      - /tmp 
+      - /var/run
+    restart: unless-stopped
+    stop_grace_period: 2s
+    networks: [local_llm]
+
+  tailscale:
+    image: tailscale/tailscale:latest
+    container_name: tailscale
+    hostname: desktop-pc
+    environment:
+      - TS_AUTH_ONCE=true
+      - TS_STATE_DIR=/var/lib/tailscale
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    volumes:
+      - tailscale-state:/var/lib/tailscale
+      - /dev/net/tun:/dev/net/tun
+    network_mode: "host"
+    restart: unless-stopped
+
+networks:
+  local_llm:
+    driver: bridge
+
+volumes:
+  openwebui-data:
+  caddy_data:
+  caddy_config:
+  tailscale-state:

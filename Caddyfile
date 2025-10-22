@@ -1,0 +1,3 @@
+http://ai.local {
+		reverse_proxy open_webui:8080
+	}

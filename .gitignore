@@ -1,0 +1,9 @@
+caddy_config/
+caddy_data/
+image_gen/models/
+image_gen/flows/
+image_gen/output/
+image_gen/settings/
+models/
+openwebui-data/
+.env
